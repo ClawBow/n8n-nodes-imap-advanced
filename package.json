@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-imap-advanced",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "n8n community nodes for advanced generic IMAP workflows",
   "license": "MIT",
   "author": "Maxime Olivier",
@@ -17,9 +17,10 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run copy-assets",
     "dev": "tsc -w",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "copy-assets": "mkdir -p dist/nodes/ImapAdvanced dist/nodes/ImapAdvancedTrigger && cp nodes/ImapAdvanced/imap.png dist/nodes/ImapAdvanced/imap.png && cp nodes/ImapAdvancedTrigger/imap.png dist/nodes/ImapAdvancedTrigger/imap.png"
   },
   "dependencies": {
     "imapflow": "^1.2.10",
