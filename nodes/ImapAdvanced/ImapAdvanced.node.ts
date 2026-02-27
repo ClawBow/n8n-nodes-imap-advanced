@@ -72,6 +72,11 @@ export class ImapAdvanced implements INodeType {
 			{ displayName: 'Raw Search JSON', name: 'searchJson', type: 'json', default: '{"seen": false}', displayOptions: { show: { resource: ['message'], operation: ['search'] } } },
 			{ displayName: 'Limit', name: 'limit', type: 'number', default: 100, displayOptions: { show: { resource: ['message'], operation: ['search'] } } },
 
+
+			{ displayName: 'Thread Strategy', name: 'threadStrategy', type: 'options', default: 'referencesThenSubject', displayOptions: { show: { resource: ['thread'], operation: ['getByMessage', 'getFull'] } }, options: [
+				{ name: 'Strict References', value: 'strictReferences' },
+				{ name: 'References Then Subject', value: 'referencesThenSubject' },
+			]},
 			{ displayName: 'Subject Fallback', name: 'subjectFallback', type: 'boolean', default: false, displayOptions: { show: { resource: ['thread'], operation: ['getByMessage', 'getFull'] } } },
 		],
 	};
@@ -170,6 +175,7 @@ export class ImapAdvanced implements INodeType {
 				if (resource === 'thread' && operation === 'getByMessage') {
 					const identifierType = this.getNodeParameter('identifierType', i) as string;
 					const subjectFallback = this.getNodeParameter('subjectFallback', i, false) as boolean;
+					const threadStrategy = this.getNodeParameter('threadStrategy', i, 'referencesThenSubject') as string;
 					let uid = Number(this.getNodeParameter('uid', i, 0));
 					if (identifierType === 'messageId') {
 						const messageId = this.getNodeParameter('messageId', i) as string;
@@ -188,7 +194,7 @@ export class ImapAdvanced implements INodeType {
 						const found = await client.search({ header: { 'Message-ID': ref } });
 						for (const u of (Array.isArray(found) ? found : [])) uids.add(Number(u));
 					}
-					if (subjectFallback && refs.length <= 1) {
+					if ((threadStrategy === 'referencesThenSubject' && subjectFallback) && refs.length <= 1) {
 						const subj = String(base.json.subject || '').replace(/^(re|fwd):\s*/i, '').trim();
 						if (subj) {
 							const found = await client.search({ subject: subj });
@@ -197,8 +203,9 @@ export class ImapAdvanced implements INodeType {
 					}
 
 					const messages = await client.fetchByUids(Array.from(uids).filter(Boolean), mailbox);
+					const byRef = new Set(Array.from(uids).filter(Boolean));
 					const normalized = messages
-						.map((m) => ({ uid: m.uid, subject: m.envelope?.subject || '', date: m.internalDate?.toISOString?.() || null, flags: Array.from(m.flags || []) }))
+						.map((m) => ({ uid: m.uid, subject: m.envelope?.subject || '', date: m.internalDate?.toISOString?.() || null, flags: Array.from(m.flags || []), matchedBy: byRef.has(Number(m.uid)) ? 'messageId' : 'subject' }))
 						.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
 
 					output.push({ json: { messageUid: uid, references: refs, messages: normalized as unknown as IDataObject[] } });
@@ -208,6 +215,7 @@ export class ImapAdvanced implements INodeType {
 				if (resource === 'thread' && operation === 'getFull') {
 					const identifierType = this.getNodeParameter('identifierType', i) as string;
 					const subjectFallback = this.getNodeParameter('subjectFallback', i, false) as boolean;
+					const threadStrategy = this.getNodeParameter('threadStrategy', i, 'referencesThenSubject') as string;
 					let uid = Number(this.getNodeParameter('uid', i, 0));
 					if (identifierType === 'messageId') {
 						const messageId = this.getNodeParameter('messageId', i) as string;
@@ -226,7 +234,7 @@ export class ImapAdvanced implements INodeType {
 						const found = await client.search({ header: { 'Message-ID': ref } });
 						for (const u of (Array.isArray(found) ? found : [])) uids.add(Number(u));
 					}
-					if (subjectFallback && refs.length <= 1) {
+					if ((threadStrategy === 'referencesThenSubject' && subjectFallback) && refs.length <= 1) {
 						const subj = String(base.json.subject || '').replace(/^(re|fwd):\s*/i, '').trim();
 						if (subj) {
 							const found = await client.search({ subject: subj });
@@ -235,13 +243,15 @@ export class ImapAdvanced implements INodeType {
 					}
 
 					const orderedUids = Array.from(uids).filter(Boolean).sort((a, b) => a - b);
+					const refUidSet = new Set<number>(orderedUids);
 					const messages: IDataObject[] = [];
 					for (const threadUid of orderedUids) {
 						const msg = await enrichMessage(this, i, client, mailbox, threadUid, true, 'none', 'attachment_', {});
+						msg.json.matchedBy = refUidSet.has(Number(threadUid)) ? 'messageId' : 'subject';
 						messages.push(msg.json);
 					}
 
-					output.push({ json: { messageUid: uid, references: refs, total: messages.length, messages } });
+					output.push({ json: { messageUid: uid, references: refs, strategy: threadStrategy, total: messages.length, messages } });
 					continue;
 				}
 
