@@ -9,7 +9,7 @@ export class ImapAdvanced implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'IMAP Advanced',
 		name: 'imapAdvanced',
-		icon: 'file:imap.svg',
+		icon: 'file:imap.png',
 		group: ['transform'],
 		version: 1,
 		description: 'Generic IMAP operations with threading and attachments',
