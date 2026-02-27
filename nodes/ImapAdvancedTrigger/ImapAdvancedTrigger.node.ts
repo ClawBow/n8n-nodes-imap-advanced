@@ -5,7 +5,7 @@ export class ImapAdvancedTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'IMAP Advanced Trigger',
 		name: 'imapAdvancedTrigger',
-		icon: 'file:imap.png',
+		icon: 'file:imap-v2.png',
 		group: ['trigger'],
 		version: 1,
 		description: 'Trigger for new emails with IMAP IDLE/poll modes',
