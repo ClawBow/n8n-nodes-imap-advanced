@@ -1,0 +1,45 @@
+{
+  "name": "n8n-nodes-imap-advanced",
+  "version": "0.1.0",
+  "description": "n8n community nodes for advanced generic IMAP workflows",
+  "license": "MIT",
+  "author": "Maxime Olivier",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "imap",
+    "mail",
+    "email"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "imapflow": "^1.2.10",
+    "mailparser": "^3.9.3"
+  },
+  "devDependencies": {
+    "@types/mailparser": "^3.4.6",
+    "@types/node": "^20.17.19",
+    "n8n-workflow": "^1.82.0",
+    "typescript": "^5.7.3"
+  },
+  "peerDependencies": {
+    "n8n-workflow": ">=1.82.0"
+  },
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [],
+    "nodes": [
+      "dist/nodes/ImapAdvanced/ImapAdvanced.node.js",
+      "dist/nodes/ImapAdvancedTrigger/ImapAdvancedTrigger.node.js"
+    ]
+  }
+}
