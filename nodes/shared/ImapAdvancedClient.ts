@@ -148,9 +148,15 @@ export function normalizeAddresses(input: any): IDataObject[] {
 }
 
 export function parseReferences(headers: Record<string, unknown>): string[] {
-	const candidates = [headers.references, headers['in-reply-to'], headers['message-id']]
-		.filter(Boolean)
-		.map((v) => String(v));
+	const rawCandidates = [headers.references, headers['in-reply-to'], headers['message-id']].filter(Boolean);
+	const candidates: string[] = [];
+	for (const v of rawCandidates) {
+		if (Array.isArray(v)) {
+			for (const x of v) candidates.push(String(x));
+		} else {
+			candidates.push(String(v));
+		}
+	}
 	const set = new Set<string>();
 	for (const line of candidates) {
 		const matches = line.match(/<[^>]+>/g) || [];
@@ -184,6 +190,11 @@ export async function enrichMessage(
 	const sourceBuffer: Buffer | undefined = data.source ? Buffer.from(data.source) : undefined;
 	const parsed = sourceBuffer ? await simpleParser(sourceBuffer) : null;
 
+	const parsedReferences = Array.isArray((parsed as any)?.references)
+		? ((parsed as any).references as string[])
+		: [];
+	const parsedInReplyTo = typeof (parsed as any)?.inReplyTo === 'string' ? (parsed as any).inReplyTo : '';
+
 	const json: IDataObject = {
 		uid: data.uid,
 		seq: data.seq,
@@ -196,8 +207,8 @@ export async function enrichMessage(
 		flags: Array.from(data.flags || []),
 		headers: headersObj,
 		thread: {
-			references: parseReferences(headersObj),
-			inReplyTo: String(headersObj['in-reply-to'] || ''),
+			references: parsedReferences.length ? parsedReferences : parseReferences(headersObj),
+			inReplyTo: parsedInReplyTo || String(headersObj['in-reply-to'] || ''),
 		},
 		body: {
 			text: parsed?.text || '',
