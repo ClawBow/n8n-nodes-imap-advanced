@@ -35,6 +35,7 @@ export class ImapAdvanced implements INodeType {
 			]},
 			{ displayName: 'Operation', name: 'operation', type: 'options', default: 'getByMessage', displayOptions: { show: { resource: ['thread'] } }, options: [
 				{ name: 'Get by Message', value: 'getByMessage' },
+				{ name: 'Get Full', value: 'getFull' },
 			]},
 			{ displayName: 'Operation', name: 'operation', type: 'options', default: 'list', displayOptions: { show: { resource: ['mailbox'] } }, options: [
 				{ name: 'List', value: 'list' },
@@ -42,12 +43,12 @@ export class ImapAdvanced implements INodeType {
 			]},
 
 			{ displayName: 'Mailbox', name: 'mailbox', type: 'string', default: 'INBOX' },
-			{ displayName: 'Identifier Type', name: 'identifierType', type: 'options', default: 'uid', displayOptions: { show: { resource: ['message', 'thread'], operation: ['get', 'getByMessage'] } }, options: [
+			{ displayName: 'Identifier Type', name: 'identifierType', type: 'options', default: 'uid', displayOptions: { show: { resource: ['message', 'thread'], operation: ['get', 'getByMessage', 'getFull'] } }, options: [
 				{ name: 'UID', value: 'uid' },
 				{ name: 'Message-ID', value: 'messageId' },
 			]},
-			{ displayName: 'UID', name: 'uid', type: 'number', default: 0, required: true, displayOptions: { show: { resource: ['message', 'thread'], operation: ['get', 'getByMessage'], identifierType: ['uid'] } } },
-			{ displayName: 'Message-ID', name: 'messageId', type: 'string', default: '', required: true, displayOptions: { show: { resource: ['message', 'thread'], operation: ['get', 'getByMessage'], identifierType: ['messageId'] } } },
+			{ displayName: 'UID', name: 'uid', type: 'number', default: 0, required: true, displayOptions: { show: { resource: ['message', 'thread'], operation: ['get', 'getByMessage', 'getFull'], identifierType: ['uid'] } } },
+			{ displayName: 'Message-ID', name: 'messageId', type: 'string', default: '', required: true, displayOptions: { show: { resource: ['message', 'thread'], operation: ['get', 'getByMessage', 'getFull'], identifierType: ['messageId'] } } },
 
 			{ displayName: 'Attachments Mode', name: 'attachmentsMode', type: 'options', default: 'metadataOnly', displayOptions: { show: { resource: ['message'], operation: ['get'] } }, options: [
 				{ name: 'None', value: 'none' },
@@ -71,7 +72,7 @@ export class ImapAdvanced implements INodeType {
 			{ displayName: 'Raw Search JSON', name: 'searchJson', type: 'json', default: '{"seen": false}', displayOptions: { show: { resource: ['message'], operation: ['search'] } } },
 			{ displayName: 'Limit', name: 'limit', type: 'number', default: 100, displayOptions: { show: { resource: ['message'], operation: ['search'] } } },
 
-			{ displayName: 'Subject Fallback', name: 'subjectFallback', type: 'boolean', default: false, displayOptions: { show: { resource: ['thread'], operation: ['getByMessage'] } } },
+			{ displayName: 'Subject Fallback', name: 'subjectFallback', type: 'boolean', default: false, displayOptions: { show: { resource: ['thread'], operation: ['getByMessage', 'getFull'] } } },
 		],
 	};
 
@@ -103,7 +104,7 @@ export class ImapAdvanced implements INodeType {
 					if (identifierType === 'messageId') {
 						const messageId = this.getNodeParameter('messageId', i) as string;
 						await client.openMailbox(mailbox);
-						const found = await client.search({ header: ['message-id', messageId] });
+						const found = await client.search({ header: { 'Message-ID': messageId } });
 						const foundList = Array.isArray(found) ? found : [];
 						uid = Number(foundList[0] || 0);
 					}
@@ -173,7 +174,7 @@ export class ImapAdvanced implements INodeType {
 					if (identifierType === 'messageId') {
 						const messageId = this.getNodeParameter('messageId', i) as string;
 						await client.openMailbox(mailbox);
-						const found = await client.search({ header: ['message-id', messageId] });
+						const found = await client.search({ header: { 'Message-ID': messageId } });
 						const foundList = Array.isArray(found) ? found : [];
 						uid = Number(foundList[0] || 0);
 					}
@@ -184,7 +185,7 @@ export class ImapAdvanced implements INodeType {
 					const uids = new Set<number>([uid]);
 
 					for (const ref of refs) {
-						const found = await client.search({ header: ['message-id', ref] });
+						const found = await client.search({ header: { 'Message-ID': ref } });
 						for (const u of (Array.isArray(found) ? found : [])) uids.add(Number(u));
 					}
 					if (subjectFallback && refs.length <= 1) {
@@ -203,6 +204,47 @@ export class ImapAdvanced implements INodeType {
 					output.push({ json: { messageUid: uid, references: refs, messages: normalized as unknown as IDataObject[] } });
 					continue;
 				}
+
+				if (resource === 'thread' && operation === 'getFull') {
+					const identifierType = this.getNodeParameter('identifierType', i) as string;
+					const subjectFallback = this.getNodeParameter('subjectFallback', i, false) as boolean;
+					let uid = Number(this.getNodeParameter('uid', i, 0));
+					if (identifierType === 'messageId') {
+						const messageId = this.getNodeParameter('messageId', i) as string;
+						await client.openMailbox(mailbox);
+						const found = await client.search({ header: { 'Message-ID': messageId } });
+						const foundList = Array.isArray(found) ? found : [];
+						uid = Number(foundList[0] || 0);
+					}
+					if (!uid) throw new Error('Base message not found');
+
+					const base = await enrichMessage(this, i, client, mailbox, uid, true, 'none', 'attachment_', {});
+					const refs = parseReferences(base.json.headers as Record<string, unknown>);
+					const uids = new Set<number>([uid]);
+
+					for (const ref of refs) {
+						const found = await client.search({ header: { 'Message-ID': ref } });
+						for (const u of (Array.isArray(found) ? found : [])) uids.add(Number(u));
+					}
+					if (subjectFallback && refs.length <= 1) {
+						const subj = String(base.json.subject || '').replace(/^(re|fwd):\s*/i, '').trim();
+						if (subj) {
+							const found = await client.search({ subject: subj });
+							for (const u of (Array.isArray(found) ? found : [])) uids.add(Number(u));
+						}
+					}
+
+					const orderedUids = Array.from(uids).filter(Boolean).sort((a, b) => a - b);
+					const messages: IDataObject[] = [];
+					for (const threadUid of orderedUids) {
+						const msg = await enrichMessage(this, i, client, mailbox, threadUid, true, 'none', 'attachment_', {});
+						messages.push(msg.json);
+					}
+
+					output.push({ json: { messageUid: uid, references: refs, total: messages.length, messages } });
+					continue;
+				}
+
 
 				throw new Error(`Unsupported combination ${resource}/${operation}`);
 			} catch (error) {

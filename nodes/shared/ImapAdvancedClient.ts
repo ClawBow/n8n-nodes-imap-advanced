@@ -66,8 +66,12 @@ export class ImapAdvancedClient {
 	}
 
 	async search(criteria: Record<string, unknown>) {
-		const query = criteria as any;
-		return this.client.search(query, { uid: true });
+		const query: Record<string, unknown> = { ...(criteria || {}) };
+		const header = query.header as unknown;
+		if (Array.isArray(header) && header.length >= 2) {
+			query.header = { [String(header[0])]: String(header[1]) };
+		}
+		return this.client.search(query as any, { uid: true });
 	}
 
 	async fetchOneByUid(uid: number, mailbox: string, includeRaw = false) {
