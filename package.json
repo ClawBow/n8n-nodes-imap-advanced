@@ -41,5 +41,10 @@
       "dist/nodes/ImapAdvanced/ImapAdvanced.node.js",
       "dist/nodes/ImapAdvancedTrigger/ImapAdvancedTrigger.node.js"
     ]
+  },
+  "homepage": "https://github.com/ClawBow/n8n-nodes-imap-advanced",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ClawBow/n8n-nodes-imap-advanced.git"
   }
 }
