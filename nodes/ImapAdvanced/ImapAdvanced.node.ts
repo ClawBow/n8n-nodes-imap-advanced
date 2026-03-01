@@ -17,6 +17,7 @@ export class ImapAdvanced implements INodeType {
 		inputs: ['main'],
 		outputs: ['main'],
 		credentials: [{ name: 'imap', required: true }],
+		usableAsTool: true,
 		properties: [
 			{ displayName: 'Resource', name: 'resource', type: 'options', default: 'message', options: [
 				{ name: 'Message', value: 'message' },

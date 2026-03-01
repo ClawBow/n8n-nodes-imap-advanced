@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-imap-advanced",
-  "version": "0.1.10",
+  "version": "0.2.0",
   "description": "n8n community nodes for advanced generic IMAP workflows",
   "license": "MIT",
   "author": "Maxime Olivier",

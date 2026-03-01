@@ -13,6 +13,7 @@ export class ImapAdvancedTrigger implements INodeType {
 		inputs: [],
 		outputs: ['main'],
 		credentials: [{ name: 'imap', required: true }],
+		usableAsTool: true,
 		properties: [
 			{ displayName: 'Mailbox', name: 'mailbox', type: 'string', default: 'INBOX' },
 			{ displayName: 'Mode', name: 'mode', type: 'options', default: 'auto', options: [
